@@ -1,0 +1,169 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Multi-tenant root (A Barbearia)
+enum Plan {
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+model Barbershop {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  cnpj        String?  @unique
+  isActive    Boolean  @default(true)
+  plan        Plan     @default(BASIC) // NOVO: Plano da assinatura
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users        User[]
+  services     Service[]
+  appointments Appointment[]
+  transactions Transaction[]
+  auditLogs    AuditLog[]
+
+  @@map("barbershops")
+}
+
+enum Role {
+  SUPERADMIN // NOVO: Dono do SaaS
+  ADMIN    
+  BARBER   
+  CUSTOMER 
+}
+
+// NOVO: Tabela de Auditoria
+model AuditLog {
+  id           String   @id @default(uuid())
+  action       String   // EX: "SUSPEND_TENANT", "DELETE_APPOINTMENT"
+  entity       String   // EX: "BARBERSHOP", "USER"
+  entityId     String?
+  details      String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  // Autor da ação
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+
+  // Barbearia afetada
+  barbershopId String?
+  barbershop   Barbershop? @relation(fields: [barbershopId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(CUSTOMER)
+  phone        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Multi-tenant relation
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
+
+  // Relations
+  appointmentsAsCustomer Appointment[] @relation("CustomerAppointments")
+  appointmentsAsBarber   Appointment[] @relation("BarberAppointments")
+  auditLogs              AuditLog[] // Logs gerados por este usuário
+
+  @@index([barbershopId])
+  @@map("users")
+}
+
+model Service {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  duration    Int      // Duração em minutos
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Multi-tenant relation
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
+
+  appointments Appointment[]
+
+  @@index([barbershopId])
+  @@map("services")
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELED
+}
+
+model Appointment {
+  id        String            @id @default(uuid())
+  date      DateTime          // Data e hora do agendamento
+  status    AppointmentStatus @default(SCHEDULED)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  // Multi-tenant relation
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
+
+  // Relations
+  customerId String
+  customer   User   @relation("CustomerAppointments", fields: [customerId], references: [id])
+
+  barberId String
+  barber   User   @relation("BarberAppointments", fields: [barberId], references: [id])
+
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id])
+
+  transaction Transaction?
+
+  @@index([barbershopId])
+  @@index([customerId])
+  @@index([barberId])
+  @@index([date]) // Indice para buscas de horários disponíveis rapidamente
+  @@map("appointments")
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  REFUND
+}
+
+model Transaction {
+  id          String          @id @default(uuid())
+  amount      Decimal         @db.Decimal(10, 2)
+  type        TransactionType @default(INCOME)
+  description String?
+  date        DateTime        @default(now())
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Multi-tenant relation
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
+
+  // Agendamento vinculado (opcional para permitir transações avulsas)
+  appointmentId String?      @unique
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id])
+
+  @@index([barbershopId])
+  @@map("transactions")
+}

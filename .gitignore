@@ -1,0 +1,25 @@
+# Dependências
+node_modules/
+dist/
+
+# Segurança e Ambiente
+.env
+*.env.local
+
+# Scripts de Diagnóstico/Reset (Não devem subir)
+debug-superadmin.ts
+diagnose-db.ts
+get-joe-id.ts
+reset-admin-joe.ts
+reset-superadmin.ts
+test-crypto.ts
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docker
+.docker
+
+# Prisma
+/prisma/migrations/

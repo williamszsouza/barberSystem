@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: barbersystem-db
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: barbershop_db
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:alpine
+    container_name: barbersystem-redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  evolution-api:
+    image: atendai/evolution-api:latest
+    container_name: evolution-api
+    restart: always
+    environment:
+      - SERVER_PORT=8080
+      - AUTH_TOKEN=4224db922b168
+    ports:
+      - "8080:8080"

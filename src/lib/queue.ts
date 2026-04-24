@@ -1,19 +1,26 @@
-import { Queue } from 'bullmq'
+import pkg from 'bullmq'
+const { Queue } = pkg
 import { Redis } from 'ioredis'
 import dotenv from 'dotenv'
 
 dotenv.config()
 
-const redisConfig = {
-  host: process.env.REDIS_HOST || '127.0.0.1',
-  port: Number(process.env.REDIS_PORT) || 6379,
-  maxRetriesPerRequest: null,
-}
-
-export const redisConnection = new Redis(redisConfig)
+// 🛡️ DINAMISMO: Suporte a URL completa (Upstash/Render) ou host/port separado
+const redisConnection = process.env.REDIS_URL 
+  ? new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: null })
+  : new Redis({
+      host: process.env.REDIS_HOST || '127.0.0.1',
+      port: Number(process.env.REDIS_PORT) || 6379,
+      maxRetriesPerRequest: null,
+    })
 
 redisConnection.on('error', (err) => {
+  // Em produção, apenas logamos o erro sem derrubar o servidor
   console.error('❌ Erro no Redis:', err.message)
+})
+
+redisConnection.on('connect', () => {
+  console.log('✅ Conectado ao Redis com sucesso!')
 })
 
 export const notificationQueue = new Queue('notifications', {
@@ -39,3 +46,5 @@ export async function addNotificationJob(data: {
     delay: delay > 0 ? delay : 0
   })
 }
+
+export { redisConnection }

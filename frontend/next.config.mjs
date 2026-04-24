@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
-  // Desabilita lint e typecheck no build para economizar memória em planos grátis
+  // Configuração padrão para Vercel
   eslint: {
     ignoreDuringBuilds: true,
   },

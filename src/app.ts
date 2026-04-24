@@ -31,8 +31,8 @@ app.register(jwt, { secret: JWT_SECRET })
 
 app.addHook('preHandler', async (request, reply) => {
   const url = request.url.split('?')[0]
-  
-  const publicPaths = ['/auth/login', '/auth/register', '/services', '/barbers', '/appointments/available-times', '/appointments/guest']
+  // 1. Definição de Rotas Públicas
+  const publicPaths = ['/', '/auth/login', '/auth/register', '/services', '/barbers', '/appointments/available-times', '/appointments/guest']
   const isPublic = publicPaths.some(path => url === path || url.startsWith(path + '/')) || (request.method === 'POST' && url === '/appointments')
 
   // Identificação básica de estabelecimento

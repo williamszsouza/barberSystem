@@ -21,7 +21,12 @@ app.register(cors, {
   credentials: true
 })
 
-const JWT_SECRET = (process.env.JWT_SECRET || 'barber-system-secret-2024').trim()
+// 🏥 ROTA DE TESTE (Health Check)
+app.get('/', async () => {
+  return { status: 'online', message: 'BarberSystem API is running', version: '1.0.0' }
+})
+
+const JWT_SECRET = process.env.JWT_SECRET || 'barber-system-secret-2024'
 app.register(jwt, { secret: JWT_SECRET })
 
 app.addHook('preHandler', async (request, reply) => {

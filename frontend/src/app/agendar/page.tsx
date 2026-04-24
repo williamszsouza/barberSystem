@@ -23,7 +23,7 @@ export default function BookingPage() {
   const [selectedBarber, setSelectedBarber] = useState<any>(null)
 
   // 🛡️ ID SINCRONIZADO PARA V1 HOMOLOGAÇÃO
-  const TEST_CUSTOMER_ID = '53c0d21a-6ff9-46ff-bb3d-ad6d69b010aa'
+  const TEST_CUSTOMER_ID = '68f482f0-04d2-46eb-85e1-dad0e4c16df4'
 
   const { data: services, isLoading: isLoadingServices } = useQuery({
     queryKey: ['services', BARBERSHOP_ID],

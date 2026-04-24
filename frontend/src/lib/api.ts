@@ -1,13 +1,13 @@
 import axios from 'axios'
 
-// 🛡️ DINAMISMO: Em produção usa a variável do Render, em dev usa localhost
 const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3334'
 
 export const api = axios.create({
   baseURL,
 })
 
-export const BARBERSHOP_ID = '6eaef11b-dd00-47b9-b46c-dd1039d22f15'
+// Sincronizado para a v1 (Barbearia Joe's Premium)
+export const BARBERSHOP_ID = 'bb006384-57cf-4d5b-bce3-d7b8d60e7ddb'
 
 api.interceptors.request.use((config) => {
   const savedUser = typeof window !== 'undefined' ? localStorage.getItem('barber_user') : null
@@ -38,7 +38,7 @@ api.interceptors.response.use(
       const savedUser = typeof window !== 'undefined' ? localStorage.getItem('barber_user') : null
       const user = savedUser ? JSON.parse(savedUser) : null
       localStorage.clear()
-      if (user?.role === 'SUPERADMIN') {
+      if (user?.role === 'SUPERADMIN' || window.location.pathname.startsWith('/superadmin')) {
         window.location.href = '/superadmin/login'
       } else {
         window.location.href = '/'

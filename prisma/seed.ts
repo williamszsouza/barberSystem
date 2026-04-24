@@ -1,96 +1,104 @@
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../src/lib/prisma.js'
 import bcrypt from 'bcryptjs'
 
-const prisma = new PrismaClient()
-
 async function main() {
-  // 1. Limpar banco
+  console.log('🚀 INICIANDO PREPARAÇÃO V1 - AMBIENTE DE HOMOLOGAÇÃO')
+
+  const defaultPassword = await bcrypt.hash('123456', 8)
+  const masterPassword = await bcrypt.hash('master2024', 8)
+
+  // 1. LIMPEZA TOTAL (RESET)
+  await prisma.auditLog.deleteMany()
   await prisma.transaction.deleteMany()
   await prisma.appointment.deleteMany()
   await prisma.service.deleteMany()
   await prisma.user.deleteMany()
   await prisma.barbershop.deleteMany()
 
-  const hashedPassword = await bcrypt.hash('123456', 8)
-  const masterPassword = await bcrypt.hash('master2024', 8)
-
-  // 1.1 Criar conta de SuperAdmin (Você)
-  // O SuperAdmin precisa estar vinculado a uma barbearia "Sede", mas pode ver todas
-  const masterBarbershop = await prisma.barbershop.create({
+  // 2. CRIAR ESTRUTURA SAAS (SUPERADMIN)
+  const hq = await prisma.barbershop.create({
     data: {
-      name: "BarberSystem HQ",
+      name: "BarberSystem HQ (SaaS)",
       cnpj: "00.000.000/0001-00",
+      plan: 'ENTERPRISE',
+      isActive: true
     }
   })
 
-  await prisma.user.create({
+  const superAdmin = await prisma.user.create({
     data: {
-      name: "Dono do Sistema",
+      name: "William SuperAdmin",
       email: "dono@barbersystem.com",
       passwordHash: masterPassword,
       role: 'SUPERADMIN',
-      barbershopId: masterBarbershop.id
+      barbershopId: hq.id
     }
   })
 
-  // 2. Criar Barbearia (Tenant)
-  const barbershop = await prisma.barbershop.create({
+  // 3. CRIAR BARBEARIA MODELO (ADMIN/TENANT)
+  const shop = await prisma.barbershop.create({
     data: {
-      name: "Barbearia do Joe",
-      description: "A melhor da cidade",
-      cnpj: "12.345.678/0001-99"
+      name: "Barbearia Joe's Premium",
+      cnpj: "12.345.678/0001-99",
+      plan: 'PRO',
+      isActive: true
     }
   })
 
-  // 3. Criar Admin
-  const admin = await prisma.user.create({
+  // 4. CRIAR USUÁRIOS PADRÃO DO SISTEMA
+  
+  // O Dono (Admin)
+  const adminOwner = await prisma.user.create({
     data: {
-      name: "Joe Admin",
+      name: "Joe Proprietário",
       email: "admin@joe.com",
-      passwordHash: hashedPassword,
+      passwordHash: defaultPassword,
       role: 'ADMIN',
-      barbershopId: barbershop.id
+      barbershopId: shop.id
     }
   })
 
-  // 4. Criar Barbeiro
-  const barber = await prisma.user.create({
+  // O Barbeiro (Barber)
+  const seniorBarber = await prisma.user.create({
     data: {
-      name: "Carlos Barbeiro",
+      name: "Carlos Barbeiro Sênior",
       email: "carlos@joe.com",
-      passwordHash: hashedPassword,
+      passwordHash: defaultPassword,
       role: 'BARBER',
-      barbershopId: barbershop.id
+      barbershopId: shop.id
     }
   })
 
-  // 4.1 Criar Cliente de Teste
-  const customer = await prisma.user.create({
+  // O Cliente (Customer)
+  const testCustomer = await prisma.user.create({
     data: {
-      name: "Cliente Teste",
-      email: "cliente@gmail.com",
-      passwordHash: hashedPassword,
+      name: "Cliente de Teste",
+      email: "cliente@homolog.com",
+      passwordHash: defaultPassword,
       role: 'CUSTOMER',
-      barbershopId: barbershop.id
+      barbershopId: shop.id
     }
   })
 
-  // 5. Criar Serviços
+  // 5. CRIAR SERVIÇOS INICIAIS
   await prisma.service.createMany({
     data: [
-      { name: "Corte Masculino", price: 50, duration: 30, barbershopId: barbershop.id },
-      { name: "Barba Terapia", price: 35, duration: 20, barbershopId: barbershop.id },
-      { name: "Combo (Cabelo + Barba)", price: 75, duration: 50, barbershopId: barbershop.id }
+      { name: "Corte de Cabelo Sênior", price: 65, duration: 40, barbershopId: shop.id },
+      { name: "Barba e Toalha Quente", price: 45, duration: 30, barbershopId: shop.id },
+      { name: "Combo Imperial (Cabelo + Barba)", price: 95, duration: 60, barbershopId: shop.id }
     ]
   })
 
-  console.log({
-    message: "Banco de dados populado com sucesso!",
-    barbershopId: barbershop.id,
-    adminEmail: admin.email,
-    barberEmail: barber.email,
-    customerId: customer.id
-  })
+  console.log('--------------------------------------------------')
+  console.log('✅ AMBIENTE V1 PREPARADO COM SUCESSO!')
+  console.log('--------------------------------------------------')
+  console.log('🔐 CREDENCIAIS DE HOMOLOGAÇÃO:')
+  console.log('1. SUPERADMIN (SaaS Control): dono@barbersystem.com / master2024')
+  console.log('2. ADMIN (Dono de Unidade): admin@joe.com / 123456')
+  console.log('3. BARBEIRO (Staff): carlos@joe.com / 123456')
+  console.log('4. CLIENTE: cliente@homolog.com / 123456')
+  console.log('--------------------------------------------------')
+  console.log('ID_TENANT_MODELO:', shop.id)
 }
 
 main()

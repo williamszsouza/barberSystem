@@ -21,6 +21,7 @@ export function Sidebar() {
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'BARBER'] },
     { name: 'Agenda', href: '/agenda', icon: Calendar, roles: ['ADMIN', 'BARBER'] },
     { name: 'Equipe', href: '/equipe', icon: Users, roles: ['ADMIN'] },
+    { name: 'Serviços', href: '/servicos', icon: Scissors, roles: ['ADMIN'] }, // NOVO
     { name: 'Transações', href: '/transacoes', icon: DollarSign, roles: ['ADMIN', 'BARBER'] },
     { name: 'Relatórios', href: '/relatorios', icon: BarChart3, roles: ['ADMIN'] },
     { name: 'Ver como Cliente', href: '/agendar', icon: Scissors, roles: ['ADMIN', 'BARBER'] },

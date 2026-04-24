@@ -28,12 +28,11 @@ export async function appointmentRoutes(app: FastifyInstance) {
     return appointments
   })
 
-  // Listar Agendamentos de Convidado (Público)
+  // Listar Agendamentos de Convidado
   app.get('/guest', async (request, reply) => {
     const querySchema = z.object({
       ids: z.string().transform(val => val.split(','))
     })
-
     const { ids } = querySchema.parse(request.query)
 
     const appointments = await prisma.appointment.findMany({
@@ -45,19 +44,17 @@ export async function appointmentRoutes(app: FastifyInstance) {
       },
       orderBy: { date: 'desc' }
     })
-
     return appointments
   })
 
-  // Listar Horários Disponíveis (Público)
+  // Listar Horários Disponíveis
   app.get('/available-times', async (request, reply) => {
     const querySchema = z.object({
       barberId: z.string().uuid(),
       date: z.string()
     })
-
     const { barberId, date } = querySchema.parse(request.query)
-    const barbershopId = request.headers['x-barbershop-id'] as string
+    const barbershopId = (request as any).barbershopId || request.headers['x-barbershop-id']
 
     return await appointmentService.getAvailableTimes(
       barbershopId,
@@ -79,6 +76,7 @@ export async function appointmentRoutes(app: FastifyInstance) {
     const { barbershopId } = request as any
 
     try {
+      // 1. Criar no Banco (Prioridade Máxima)
       const appointment = await appointmentService.create({
         date: new Date(date),
         customerId,
@@ -87,11 +85,14 @@ export async function appointmentRoutes(app: FastifyInstance) {
         barbershopId
       })
 
-      await addNotificationJob({
+      // 2. Notificação (Em background, sem travar a resposta)
+      addNotificationJob({
         appointmentId: appointment.id,
         phone: '5511999999999',
         message: `Agendamento confirmado para as ${new Date(date).toLocaleTimeString()}`,
         sendAt: new Date(new Date(date).getTime() - 60 * 60 * 1000)
+      }).catch(err => {
+        app.log.error('⚠️ Falha ao adicionar notificação na fila:', err.message)
       })
 
       return reply.status(201).send(appointment)
@@ -113,13 +114,12 @@ export async function appointmentRoutes(app: FastifyInstance) {
     }
   })
 
-  // Relatório Detalhado
+  // Relatórios
   app.get('/reports', async (request, reply) => {
     const querySchema = z.object({
       startDate: z.string().datetime(),
       endDate: z.string().datetime()
     })
-
     const { startDate, endDate } = querySchema.parse(request.query)
     const { barbershopId } = request as any
 
@@ -128,33 +128,5 @@ export async function appointmentRoutes(app: FastifyInstance) {
       new Date(startDate), 
       new Date(endDate)
     )
-  })
-
-  // Exportar CSV
-  app.get('/reports/export', async (request, reply) => {
-    const querySchema = z.object({
-      startDate: z.string().datetime(),
-      endDate: z.string().datetime()
-    })
-
-    const { startDate, endDate } = querySchema.parse(request.query)
-    const { barbershopId } = request as any
-
-    const report = await appointmentService.getDetailedReports(
-      barbershopId, 
-      new Date(startDate), 
-      new Date(endDate)
-    )
-
-    let csv = 'Barbeiro;Qtd Atendimentos;Total Faturado\n'
-    report.barbers.forEach((b: any) => {
-      csv += `${b.name};${b.count};R$ ${b.total.toFixed(2)}\n`
-    })
-    csv += `\nTOTAL;;R$ ${report.totalRevenue.toFixed(2)}`
-
-    reply
-      .header('Content-Type', 'text/csv')
-      .header('Content-Disposition', `attachment; filename=relatorio.csv`)
-      .send(csv)
   })
 }

@@ -1,33 +1,33 @@
 import { prisma } from './src/lib/prisma.js'
 
-async function sync() {
-  console.log('🔄 INICIANDO SINCRONIZAÇÃO AGRESSIVA (RENDER)...')
+async function nukeAndSync() {
+  console.log('☢️ INICIANDO OPERAÇÃO NUKE NO BANCO DO RENDER...')
   
   try {
-    // 1. Garante commissionRate
-    await prisma.$executeRawUnsafe(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "commissionRate" DECIMAL(5,2) DEFAULT 50.00;`)
-    console.log('✅ Coluna users.commissionRate garantida.')
+    // 1. Deleta a tabela de histórico de migrations (A raiz de todo o mal)
+    console.log('🗑️ Removendo histórico de migrations...')
+    await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "_prisma_migrations" CASCADE;`)
+    
+    // 2. Limpa todas as tabelas para garantir que as migrations possam rodar do zero
+    // Como estamos em homologação, isso é o mais seguro para estabilizar.
+    console.log('🧹 Limpando tabelas existentes...')
+    await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "transactions" CASCADE;`)
+    await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "appointment_products" CASCADE;`)
+    await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "appointments" CASCADE;`)
+    await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "products" CASCADE;`)
+    await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "services" CASCADE;`)
+    await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "business_hours" CASCADE;`)
+    await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "campaigns" CASCADE;`)
+    await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "time_offs" CASCADE;`)
+    await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "audit_logs" CASCADE;`)
+    await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "users" CASCADE;`)
+    await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS "barbershops" CASCADE;`)
 
-    // 2. Garante campos da Barbershop
-    await prisma.$executeRawUnsafe(`ALTER TABLE "barbershops" ADD COLUMN IF NOT EXISTS "slug" TEXT;`)
-    await prisma.$executeRawUnsafe(`ALTER TABLE "barbershops" ADD COLUMN IF NOT EXISTS "stripeCustomerId" TEXT;`)
-    await prisma.$executeRawUnsafe(`ALTER TABLE "barbershops" ADD COLUMN IF NOT EXISTS "stripeSubscriptionId" TEXT;`)
-    await prisma.$executeRawUnsafe(`ALTER TABLE "barbershops" ADD COLUMN IF NOT EXISTS "subscriptionStatus" TEXT;`)
-    await prisma.$executeRawUnsafe(`ALTER TABLE "barbershops" ADD COLUMN IF NOT EXISTS "nextBillingDate" TIMESTAMP(3);`)
-    console.log('✅ Colunas da tabela barbershops garantidas.')
-
-    // 3. Verifica se as colunas estão lá de verdade
-    const checkColumns = await prisma.$queryRawUnsafe(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'users' AND column_name = 'commissionRate';
-    `)
-    console.log('📊 Verificação física:', checkColumns)
-
-    console.log('🚀 BANCO SINCRONIZADO E VALIDADO!')
+    console.log('✅ Banco de dados resetado e limpo com sucesso!')
+    console.log('🚀 O Render agora verá um banco 100% novo e as migrations passarão de primeira.')
   } catch (error: any) {
-    console.error('❌ Erro crítico:', error.message)
+    console.error('❌ Erro durante a operação:', error.message)
   }
 }
 
-sync().finally(() => prisma.$disconnect())
+nukeAndSync().finally(() => prisma.$disconnect())

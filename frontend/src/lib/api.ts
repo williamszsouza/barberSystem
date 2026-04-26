@@ -31,7 +31,7 @@ export const resolveBarbershop = async () => {
   }
 
   if (!slug || slug === 'www' || slug === 'barbersystem') {
-    return localStorage.getItem('barber_tenant_id') || '8ca52926-30b1-4fe9-946b-e833af6eb601'
+    return localStorage.getItem('barber_tenant_id') || '7c0ba993-ddfd-496b-932a-b1e5cd0edc30'
   }
   try {
     const res = await api.get(`/barbershops/by-slug/${slug}`)
@@ -48,9 +48,9 @@ export const resolveBarbershop = async () => {
 // 🛡️ CORREÇÃO: BARBERSHOP_ID agora é um Getter dinâmico
 export const getActiveBarbershopId = () => {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('barber_tenant_id') || '8ca52926-30b1-4fe9-946b-e833af6eb601'
+    return localStorage.getItem('barber_tenant_id') || '7c0ba993-ddfd-496b-932a-b1e5cd0edc30'
   }
-  return '8ca52926-30b1-4fe9-946b-e833af6eb601'
+  return '7c0ba993-ddfd-496b-932a-b1e5cd0edc30'
 }
 
 // Para manter compatibilidade com o código atual:

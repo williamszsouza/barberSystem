@@ -1,9 +1,15 @@
 import { prisma } from './src/lib/prisma.js'
 
-async function get() {
-  const b = await prisma.barbershop.findFirst({ where: { name: "Barbearia Joe's Premium" } })
-  const c = await prisma.user.findFirst({ where: { email: 'cliente@homolog.com' } })
-  console.log('ID_TENANT:', b?.id)
-  console.log('ID_CLIENTE:', c?.id)
+async function getID() {
+  const shop = await prisma.barbershop.findUnique({
+    where: { slug: 'barber-homolog' }
+  })
+  
+  if (shop) {
+    console.log(`🆔 ID REAL: ${shop.id}`)
+  } else {
+    console.log('❌ Barbearia não encontrada no banco do Render.')
+  }
 }
-get().finally(() => prisma.$disconnect())
+
+getID().finally(() => prisma.$disconnect())

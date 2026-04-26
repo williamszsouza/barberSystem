@@ -21,8 +21,8 @@ const app = Fastify({ logger: true })
 
 app.register(cors, { 
   origin: (origin, cb) => {
-    // Permite localhost e seus subdomínios, e futuramente seu domínio oficial
-    if (!origin || /localhost/.test(origin) || /\.barbersystem\.com$/.test(origin)) {
+    // 🛡️ Permite Localhost, Vercel (Homologação) e seu Domínio Oficial
+    if (!origin || /localhost/.test(origin) || /\.vercel\.app$/.test(origin) || /\.barbersystem\.com$/.test(origin)) {
       cb(null, true)
       return
     }

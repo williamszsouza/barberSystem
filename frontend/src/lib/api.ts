@@ -11,13 +11,28 @@ export const resolveBarbershop = async () => {
   const hostname = window.location.hostname
   const parts = hostname.split('.')
 
-  // Detecção de subdomínio
-  let slug = parts.length > 1 && parts[0] !== 'localhost' ? parts[0] : null
+  let slug = null
 
-  if (!slug) {
-    return localStorage.getItem('barber_tenant_id') || '8ca52926-30b1-4fe9-946b-e833af6eb601'
+  // Lógica inteligente para subdomínios:
+  if (parts.length > 1) {
+    if (parts[parts.length - 1] === 'localhost') {
+      slug = parts[0]
+    } else if (hostname.includes('.vercel.app')) {
+      // 🚀 Se for .vercel.app, só é subdomínio se tiver MAIS de 3 partes
+      // projeto.vercel.app (3 partes) -> Não é barbearia
+      // barbearia.projeto.vercel.app (4 partes) -> É barbearia
+      if (parts.length > 3) {
+        slug = parts[0]
+      }
+    } else if (parts.length >= 2) {
+      // Caso seja joe.seudominio.com
+      slug = parts[0]
+    }
   }
 
+  if (!slug || slug === 'www' || slug === 'barbersystem') {
+    return localStorage.getItem('barber_tenant_id') || '8ca52926-30b1-4fe9-946b-e833af6eb601'
+  }
   try {
     const res = await api.get(`/barbershops/by-slug/${slug}`)
     const shopId = res.data.id

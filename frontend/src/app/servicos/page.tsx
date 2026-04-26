@@ -20,6 +20,7 @@ import { StatusView } from '@/components/StatusView'
 export default function ServicesPage() {
   const queryClient = useQueryClient()
   const [showAddForm, setShowAddForm] = useState(false)
+  const [page, setPage] = useState(1)
 
   // Estados do Form
   const [name, setName] = useState('')
@@ -27,10 +28,13 @@ export default function ServicesPage() {
   const [duration, setDuration] = useState('')
 
   // 1. Listar Serviços
-  const { data: services, isLoading, isError, refetch } = useQuery({
-    queryKey: ['services-mgmt'],
-    queryFn: async () => (await api.get('/services-mgmt')).data
+  const { data: response, isLoading, isError, refetch } = useQuery({
+    queryKey: ['services-mgmt', page],
+    queryFn: async () => (await api.get(`/services-mgmt?page=${page}&limit=12`)).data
   })
+
+  const services = response?.data || []
+  const meta = response?.meta
 
   // 2. Mutação Adicionar
   const addMutation = useMutation({

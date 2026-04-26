@@ -25,17 +25,29 @@ export default function SuperAdminPage() {
   const queryClient = useQueryClient()
   const [tab, setView] = useState<'tenants' | 'logs'>('tenants')
   const [showAddForm, setShowAddForm] = useState(false)
+  const [page, setPage] = useState(1)
   
   // Estados do Form Expandido
   const [newShopName, setNewShopName] = useState('')
+  const [newShopSlug, setNewShopSlug] = useState('') // 🚀 NOVO: Slug
   const [newShopPlan, setNewShopPlan] = useState<'BASIC' | 'PRO' | 'ENTERPRISE'>('BASIC')
   const [ownerName, setOwnerName] = useState('')
   const [ownerEmail, setOwnerEmail] = useState('')
   const [ownerPassword, setOwnerPassword] = useState('')
 
-  const { data: tenants, isLoading: isLoadingTenants } = useQuery({
-    queryKey: ['saas-tenants'],
-    queryFn: async () => (await api.get('/saas/barbershops')).data
+  const { data: tenantsResponse, isLoading: isLoadingTenants } = useQuery({
+    queryKey: ['saas-tenants', page],
+    queryFn: async () => (await api.get(`/saas/barbershops?page=${page}&limit=20`)).data
+  })
+
+  // Atalhos para facilitar o código
+  const tenants = tenantsResponse?.data || []
+  const meta = tenantsResponse?.meta
+
+  // 🚀 BUSCA DINÂMICA DE PLANOS E PREÇOS
+  const { data: plans } = useQuery({
+    queryKey: ['saas-plans'],
+    queryFn: async () => (await api.get('/saas/plans')).data
   })
 
   const createMutation = useMutation({
@@ -43,7 +55,7 @@ export default function SuperAdminPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['saas-tenants'] })
       setShowAddForm(false)
-      setNewShopName(''); setOwnerName(''); setOwnerEmail(''); setOwnerPassword('');
+      setNewShopName(''); setNewShopSlug(''); setOwnerName(''); setOwnerEmail(''); setOwnerPassword('');
       alert('Barbearia e conta do proprietário criadas com sucesso!')
     },
     onError: (error: any) => alert(error.response?.data?.error || 'Erro ao criar')
@@ -62,6 +74,16 @@ export default function SuperAdminPage() {
     }
   })
 
+  // 💰 NOVO: Registrar Pagamento Manual
+  const paymentMutation = useMutation({
+    mutationFn: async (id: string) => api.post(`/saas/barbershops/${id}/register-payment`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['saas-tenants'] })
+      queryClient.invalidateQueries({ queryKey: ['saas-logs'] })
+      alert('Pagamento registrado! Assinatura estendida por 30 dias.')
+    }
+  })
+
   const handleLogout = () => {
     localStorage.removeItem('barber_user')
     localStorage.removeItem('barber_token')
@@ -75,6 +97,19 @@ export default function SuperAdminPage() {
       default: return <Badge variant="outline" className="text-zinc-500 gap-1"><Rocket className="w-3 h-3" /> BASIC</Badge>
     }
   }
+
+  const getPlanPrice = (planKey: string) => {
+    return plans ? plans[planKey]?.price || 0 : 0
+  }
+
+  // O MRR agora é calculado apenas sobre a página atual ou idealmente viria do backend
+  // Para manter a consistência com 1000 shops, o MRR deve considerar todos os ativos.
+  // Como é um dashboard SuperAdmin, o ideal é o backend retornar o MRR total.
+  // Por agora, vamos mostrar o MRR baseado no totalActive do meta.
+  const totalActive = meta?.totalActive || 0
+  // @ts-ignore
+  const averagePrice = 159.90 // Média ponderada aproximada para o card
+  const estimatedMrr = tenants?.filter((t: any) => t.isActive).reduce((acc: number, t: any) => acc + getPlanPrice(t.plan), 0) || 0
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-8">
@@ -110,19 +145,52 @@ export default function SuperAdminPage() {
 
         {tab === 'tenants' ? (
           <div className="grid gap-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+               <Card className="bg-zinc-900 border-zinc-800 shadow-xl">
+                  <CardHeader className="pb-2 text-zinc-500 text-[10px] font-black uppercase tracking-widest">Receita Mensal (Pág. Atual)</CardHeader>
+                  <CardContent className="text-4xl font-black text-amber-500">
+                    R$ {estimatedMrr.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </CardContent>
+               </Card>
                <Card className="bg-zinc-900 border-zinc-800 shadow-xl">
                   <CardHeader className="pb-2 text-zinc-500 text-[10px] font-black uppercase tracking-widest">Total de Clientes SaaS</CardHeader>
-                  <CardContent className="text-4xl font-black">{tenants?.length || 0}</CardContent>
+                  <CardContent className="text-4xl font-black">{meta?.total || 0}</CardContent>
                </Card>
                <Card className="bg-zinc-900 border-zinc-800 shadow-xl">
                   <CardHeader className="pb-2 text-zinc-500 text-[10px] font-black uppercase tracking-widest">Barbearias Ativas</CardHeader>
-                  <CardContent className="text-4xl font-black text-green-500">{tenants?.filter((t:any) => t.isActive).length || 0}</CardContent>
+                  <CardContent className="text-4xl font-black text-green-500">{meta?.totalActive || 0}</CardContent>
                </Card>
                <Card className="bg-zinc-900 border-zinc-800 shadow-xl">
                   <CardHeader className="pb-2 text-zinc-500 text-[10px] font-black uppercase tracking-widest">Em Atraso / Suspensas</CardHeader>
-                  <CardContent className="text-4xl font-black text-red-500">{tenants?.filter((t:any) => !t.isActive).length || 0}</CardContent>
+                  <CardContent className="text-4xl font-black text-red-500">{meta?.totalSuspended || 0}</CardContent>
                </Card>
+            </div>
+            
+            {/* PAGINAÇÃO */}
+            <div className="flex justify-between items-center bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800">
+               <div className="text-xs text-zinc-500 font-bold uppercase tracking-widest">
+                  Página {page} de {meta?.totalPages || 1}
+               </div>
+               <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    disabled={page === 1} 
+                    onClick={() => setPage(p => p - 1)}
+                    className="border-zinc-800"
+                  >
+                    Anterior
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    disabled={page >= (meta?.totalPages || 1)} 
+                    onClick={() => setPage(p => p + 1)}
+                    className="border-zinc-800"
+                  >
+                    Próxima
+                  </Button>
+               </div>
             </div>
 
             {showAddForm && (
@@ -140,16 +208,21 @@ export default function SuperAdminPage() {
                         <Input placeholder="Ex: Barbearia Elite" className="bg-black border-zinc-800" value={newShopName} onChange={e => setNewShopName(e.target.value)} />
                       </div>
                       <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase">Subdomínio (Slug)</span>
+                        <Input placeholder="Ex: elite-barber" className="bg-black border-zinc-800" value={newShopSlug} onChange={e => setNewShopSlug(e.target.value.toLowerCase())} />
+                      </div>
+                      <div className="space-y-2">
                         <span className="text-[10px] font-bold text-zinc-400 uppercase">Plano Selecionado</span>
                         <select 
                           className="w-full h-10 bg-black border border-zinc-800 rounded-md px-3 text-sm text-zinc-300"
                           value={newShopPlan}
                           onChange={(e: any) => setNewShopPlan(e.target.value)}
                         >
-                          <option value="BASIC">BASIC</option>
-                          <option value="PRO">PRO</option>
-                          <option value="ENTERPRISE">ENTERPRISE</option>
+                          <option value="BASIC">BASIC (R$ 89,90)</option>
+                          <option value="PRO">PRO (R$ 159,90)</option>
+                          <option value="ENTERPRISE">ENTERPRISE (R$ 299,90)</option>
                         </select>
+
                       </div>
                     </div>
 
@@ -174,9 +247,10 @@ export default function SuperAdminPage() {
                     <Button variant="ghost" className="text-zinc-500" onClick={() => setShowAddForm(false)}>Cancelar</Button>
                     <Button 
                       className="bg-amber-500 text-zinc-950 font-black px-12"
-                      disabled={createMutation.isPending || !newShopName || !ownerEmail || !ownerPassword}
+                      disabled={createMutation.isPending || !newShopName || !ownerEmail || !ownerPassword || !newShopSlug}
                       onClick={() => createMutation.mutate({ 
                         name: newShopName, 
+                        slug: newShopSlug,
                         plan: newShopPlan,
                         ownerName,
                         ownerEmail,
@@ -195,24 +269,42 @@ export default function SuperAdminPage() {
                 <TableHeader className="bg-zinc-950/50 border-b border-zinc-800">
                    <TableRow className="hover:bg-transparent">
                       <TableHead className="pl-6">Estabelecimento</TableHead>
+                      <TableHead>URL de Acesso</TableHead>
                       <TableHead>Plano</TableHead>
-                      <TableHead className="text-center">Uso (Agenda)</TableHead>
+                      <TableHead className="text-center">Receita</TableHead>
+                      <TableHead className="text-center">Próximo Vencimento</TableHead>
                       <TableHead className="text-center">Assinatura</TableHead>
                       <TableHead className="text-right pr-6">Controle de Mestre</TableHead>
                    </TableRow>
                 </TableHeader>
                 <TableBody>
                    {isLoadingTenants ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-20"><Loader2 className="animate-spin mx-auto text-amber-500" /></TableCell></TableRow>
+                      <TableRow><TableCell colSpan={7} className="text-center py-20"><Loader2 className="animate-spin mx-auto text-amber-500" /></TableCell></TableRow>
                    ) : tenants?.map((shop: any) => (
                       <TableRow key={shop.id} className="border-zinc-800 hover:bg-zinc-800/20 transition-colors">
                          <TableCell className="pl-6 py-6">
                             <p className="font-bold text-zinc-100">{shop.name}</p>
                             <p className="text-[10px] text-zinc-500 font-mono">{shop.id}</p>
                          </TableCell>
+                         <TableCell>
+                            <a 
+                              href={`http://${shop.slug}.localhost:3000`} 
+                              target="_blank" 
+                              className="text-xs text-amber-500 hover:underline font-mono"
+                            >
+                              {shop.slug}.barbersystem.com
+                            </a>
+                         </TableCell>
                          <TableCell>{getPlanBadge(shop.plan)}</TableCell>
                          <TableCell className="text-center">
-                            <span className="text-xs font-bold text-zinc-400">{shop._count.appointments} cortes realizados</span>
+                            <span className="font-bold text-amber-500">
+                              R$ {shop.isActive ? getPlanPrice(shop.plan).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+                            </span>
+                         </TableCell>
+                         <TableCell className="text-center">
+                            <span className="text-xs font-bold text-zinc-400">
+                              {shop.nextBillingDate ? format(new Date(shop.nextBillingDate), "dd/MM/yyyy") : 'N/A'}
+                            </span>
                          </TableCell>
                          <TableCell className="text-center">
                             {shop.isActive ? (
@@ -221,14 +313,23 @@ export default function SuperAdminPage() {
                                <Badge className="bg-red-500/10 text-red-500 border-red-500/20">PENDENTE / SUSPENSO</Badge>
                             )}
                          </TableCell>
-                         <TableCell className="text-right pr-6">
+                         <TableCell className="text-right pr-6 space-x-2">
+                            <Button 
+                               variant="outline" 
+                               size="sm" 
+                               className="border-amber-900/50 text-amber-500 hover:bg-amber-500/10"
+                               onClick={() => paymentMutation.mutate(shop.id)}
+                               disabled={paymentMutation.isPending}
+                            >
+                               {paymentMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Registrar Pagamento'}
+                            </Button>
                             <Button 
                                variant="outline" 
                                size="sm" 
                                className={shop.isActive ? "border-red-900/50 text-red-500 hover:bg-red-500/10" : "border-green-900/50 text-green-500 hover:bg-green-500/10"}
                                onClick={() => toggleMutation.mutate(shop.id)}
                             >
-                               {shop.isActive ? 'Bloquear Acesso' : 'Reativar Sistema'}
+                               {shop.isActive ? 'Bloquear' : 'Reativar'}
                             </Button>
                          </TableCell>
                       </TableRow>
@@ -237,7 +338,8 @@ export default function SuperAdminPage() {
               </Table>
             </Card>
           </div>
-        ) : (
+        )
+ : (
           <Card className="bg-zinc-900/50 border-zinc-800 shadow-2xl overflow-hidden animate-in fade-in duration-500">
              <Table>
                 <TableHeader className="bg-zinc-950/50 border-b border-zinc-800">

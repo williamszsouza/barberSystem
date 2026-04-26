@@ -9,6 +9,7 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { BARBERSHOP_ID } from '@/lib/api' // 🚀 IMPORTADO
 
 export default function MyAppointments() {
   const [localIds, setLocalIds] = useState<string[]>([])
@@ -20,12 +21,12 @@ export default function MyAppointments() {
     }
   }, [])
 
-  // 🛡️ CORREÇÃO: Agora buscamos apenas os nossos IDs via rota pública de convidados
+  // 🛡️ CORREÇÃO: Enviando o barbershopId obrigatório
   const { data: appointments, isLoading } = useQuery({
-    queryKey: ['my-appointments', localIds],
+    queryKey: ['my-appointments', localIds, BARBERSHOP_ID],
     queryFn: async () => {
       if (localIds.length === 0) return []
-      const response = await api.get(`/appointments/guest?ids=${localIds.join(',')}`)
+      const response = await api.get(`/appointments/guest?ids=${localIds.join(',')}&barbershopId=${BARBERSHOP_ID}`)
       return response.data
     },
     enabled: localIds.length > 0

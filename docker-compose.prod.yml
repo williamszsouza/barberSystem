@@ -1,55 +1,57 @@
-version: '3.8'
-
 services:
-  backend:
-    build:
-      context: .
-      dockerfile: backend.Dockerfile
-    container_name: barber-backend
-    restart: always
-    ports:
-      - "3334:3334"
-    env_file: .env
-    depends_on:
-      - postgres
-      - redis
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: frontend.Dockerfile
-    container_name: barber-frontend
-    restart: always
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3334
-
-  postgres:
-    image: postgres:15-alpine
-    container_name: barber-db
+  barber-db:
+    image: postgres:15
+    container_name: barber-db-prod
     restart: always
     environment:
-      POSTGRES_USER: ${DB_USER:-admin}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
-      POSTGRES_DB: ${DB_NAME:-barbershop_db}
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: barbershop_db
+    ports:
+      - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d barbershop_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:alpine
-    container_name: barber-redis
+    container_name: barber-redis-prod
     restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   evolution-api:
-    image: atendai/evolution-api:latest
-    container_name: evolution-api
+    image: atendai/evolution-api:v1.8.2
+    container_name: barber-evolution-prod
     restart: always
     environment:
       - SERVER_PORT=8080
-      - AUTH_TOKEN=${EVOLUTION_TOKEN}
+      - SERVER_URL=${SERVER_URL}
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
+      - DATABASE_ENABLED=false
+      - CACHE_REDIS_ENABLED=false
+      - CACHE_LOCAL_ENABLED=true
+      - ENABLED_INTEGRATIONS=whatsapp
     ports:
       - "8080:8080"
+    volumes:
+      - evolution_instances_prod:/evolution/instances
+    depends_on:
+      redis:
+        condition: service_healthy
+      barber-db:
+        condition: service_healthy
 
 volumes:
-  pgdata:
+  pgdata_prod:
+  evolution_instances_prod:

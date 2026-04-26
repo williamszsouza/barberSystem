@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Calendar, BarChart3, Scissors, LogOut, LayoutDashboard, DollarSign, Users } from 'lucide-react'
+import { Home, Calendar, BarChart3, Scissors, LogOut, LayoutDashboard, DollarSign, Users, Megaphone, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 
@@ -21,8 +21,11 @@ export function Sidebar() {
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'BARBER'] },
     { name: 'Agenda', href: '/agenda', icon: Calendar, roles: ['ADMIN', 'BARBER'] },
     { name: 'Equipe', href: '/equipe', icon: Users, roles: ['ADMIN'] },
-    { name: 'Serviços', href: '/servicos', icon: Scissors, roles: ['ADMIN'] }, // NOVO
+    { name: 'Serviços', href: '/servicos', icon: Scissors, roles: ['ADMIN'] },
+    { name: 'Produtos', href: '/produtos', icon: Home, roles: ['ADMIN'] },
     { name: 'Transações', href: '/transacoes', icon: DollarSign, roles: ['ADMIN', 'BARBER'] },
+    { name: 'Marketing', href: '/dashboard/marketing', icon: Megaphone, roles: ['ADMIN'] }, // 🚀 NOVO
+    { name: 'Configurações', href: '/dashboard/config', icon: Settings, roles: ['ADMIN'] }, // 🚀 NOVO
     { name: 'Relatórios', href: '/relatorios', icon: BarChart3, roles: ['ADMIN'] },
     { name: 'Ver como Cliente', href: '/agendar', icon: Scissors, roles: ['ADMIN', 'BARBER'] },
   ]

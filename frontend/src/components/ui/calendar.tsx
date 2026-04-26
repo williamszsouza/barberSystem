@@ -180,16 +180,16 @@ function Calendar({
   )
 }
 
-function CalendarDayButton({
-  className,
-  day,
-  modifiers,
-  locale,
-  ...props
-}: React.ComponentProps<typeof DayButton> & { locale?: Partial<Locale> }) {
+const CalendarDayButton = React.forwardRef<
+  HTMLButtonElement,
+  React.ComponentProps<typeof DayButton> & { locale?: Partial<Locale> }
+>(({ className, day, modifiers, locale, ...props }, forwardedRef) => {
   const defaultClassNames = getDefaultClassNames()
 
   const ref = React.useRef<HTMLButtonElement>(null)
+
+  React.useImperativeHandle(forwardedRef, () => ref.current!)
+
   React.useEffect(() => {
     if (modifiers.focused) ref.current?.focus()
   }, [modifiers.focused])
@@ -217,6 +217,7 @@ function CalendarDayButton({
       {...props}
     />
   )
-}
+})
+CalendarDayButton.displayName = "CalendarDayButton"
 
 export { Calendar, CalendarDayButton }

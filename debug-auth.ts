@@ -1,48 +1,47 @@
-import Fastify from 'fastify'
-import jwt from '@fastify/jwt'
+import axios from 'axios'
+import { prisma } from './src/lib/prisma.js'
 import dotenv from 'dotenv'
 
 dotenv.config()
 
-async function run() {
-  const app = Fastify()
-  const JWT_SECRET = (process.env.JWT_SECRET || 'barber-system-secret-2024').replace(/['"]/g, '')
+async function debugWhatsApp() {
+  console.log('🔍 INICIANDO DIAGNÓSTICO DE WHATSAPP...')
   
-  console.log('JWT_SECRET being used:', JWT_SECRET)
-  
-  app.register(jwt, { secret: JWT_SECRET })
-  await app.ready()
+  const phone = '5541992522151'
+  const instance = 'barber_instance'
+  const apikey = '4224db922b168'
+  const url = 'http://localhost:8080'
 
-  const payload = {
-    id: 'super-admin-id',
-    role: 'SUPERADMIN',
-    barbershopId: 'some-barbershop-id'
+  console.log(`1. Verificando se a instância [${instance}] está ativa na API...`)
+  try {
+    const check = await axios.get(`${url}/instance/fetchInstances`, { headers: { apikey } })
+    const exists = check.data.find((i: any) => i.instanceName === instance)
+    
+    if (!exists) {
+      console.error(`❌ ERRO: A instância [${instance}] não existe na Evolution API!`)
+      console.log('Instâncias encontradas:', check.data.map((i: any) => i.instanceName))
+      return
+    }
+    console.log(`✅ Instância [${instance}] encontrada e ativa!`)
+  } catch (e: any) {
+    console.error('❌ ERRO ao conectar na Evolution API. O Docker está rodando?')
+    return
   }
 
-  const token = app.jwt.sign(payload)
-  console.log('Generated Token:', token)
-
+  console.log(`2. Tentando disparo de teste para ${phone}...`)
   try {
-    const decoded = await app.jwt.verify(token)
-    console.log('Successfully verified token:', decoded)
-  } catch (err: any) {
-    console.error('Verification failed!')
-    console.error('Error Name:', err.name)
-    console.error('Error Message:', err.message)
-  }
+    const res = await axios.post(`${url}/message/sendText/${instance}`, {
+      number: phone,
+      text: "Teste de Diagnóstico BarberSystem! ✂️",
+      delay: 100
+    }, { headers: { apikey } })
 
-  // Test with another secret
-  const app2 = Fastify()
-  app2.register(jwt, { secret: JWT_SECRET + 'wrong' })
-  await app2.ready()
-  
-  try {
-    await app2.jwt.verify(token)
-  } catch (err: any) {
-    console.log('\nExpected failure with wrong secret:')
-    console.log('Error Name:', err.name)
-    console.log('Error Message:', err.message)
+    console.log('✅ SUCESSO NO DISPARO!')
+    console.log('Resposta:', JSON.stringify(res.data))
+  } catch (error: any) {
+    console.error('❌ FALHA NO ENVIO:')
+    console.error(error.response?.data || error.message)
   }
 }
 
-run()
+debugWhatsApp()

@@ -20,6 +20,7 @@ import { StatusView } from '@/components/StatusView'
 export default function TeamPage() {
   const queryClient = useQueryClient()
   const [showAddForm, setShowAddForm] = useState(false)
+  const [page, setPage] = useState(1)
 
   // Estados do Form
   const [name, setName] = useState('')
@@ -27,10 +28,13 @@ export default function TeamPage() {
   const [password, setPassword] = useState('')
 
   // 1. Listar Barbeiros
-  const { data: team, isLoading, isError, refetch } = useQuery({
-    queryKey: ['team'],
-    queryFn: async () => (await api.get('/team')).data
+  const { data: response, isLoading, isError, refetch } = useQuery({
+    queryKey: ['team', page],
+    queryFn: async () => (await api.get(`/team?page=${page}&limit=10`)).data
   })
+
+  const team = response?.data || []
+  const meta = response?.meta
 
   // 2. Mutação Adicionar
   const addMutation = useMutation({

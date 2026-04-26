@@ -1,57 +1,31 @@
-import Fastify from 'fastify'
-import jwt from '@fastify/jwt'
-import { appointmentRoutes } from './src/routes/appointments.js'
-import dotenv from 'dotenv'
 import { prisma } from './src/lib/prisma.js'
 
-dotenv.config()
-
-async function test() {
-  const app = Fastify()
-  const JWT_SECRET = (process.env.JWT_SECRET || 'barber-system-secret-2024').replace(/['"]/g, '')
+async function checkLastAppointment() {
+  console.log('🔍 ANALISANDO ÚLTIMO AGENDAMENTO...')
   
-  app.register(jwt, { secret: JWT_SECRET })
-  app.register(appointmentRoutes, { prefix: '/appointments' })
-  
-  // Mock preHandler hook
-  app.addHook('preHandler', async (request, reply) => {
-    const authHeader = request.headers.authorization
-    const token = authHeader?.replace(/Bearer\s+/i, '')
-    
-    if (!token) {
-      return reply.status(401).send({ error: 'Token ausente' })
-    }
-
-    try {
-      const payload = await app.jwt.verify(token)
-      ;(request as any).userId = (payload as any).id
-      ;(request as any).userRole = (payload as any).role
-      ;(request as any).barbershopId = (payload as any).barbershopId
-    } catch (err: any) {
-      return reply.status(401).send({ error: 'Sessão inválida', message: err.message })
+  const lastApt = await prisma.appointment.findFirst({
+    orderBy: { createdAt: 'desc' },
+    include: {
+      customer: true,
+      barbershop: true
     }
   })
 
-  await app.ready()
-
-  const payload = {
-    id: 'super-admin-id',
-    role: 'SUPERADMIN',
-    barbershopId: '6eaef11b-dd00-47b9-b46c-dd1039d22f15'
+  if (!lastApt) {
+    console.log('❌ Nenhum agendamento encontrado no banco.')
+    return
   }
 
-  const token = app.jwt.sign(payload)
-  
-  const response = await app.inject({
-    method: 'GET',
-    url: '/appointments/reports?startDate=2024-01-01T00:00:00Z&endDate=2024-12-31T23:59:59Z',
-    headers: {
-      authorization: `Bearer ${token}`
-    }
-  })
+  console.log(`📅 Data: ${lastApt.date}`)
+  console.log(`👤 Cliente: ${lastApt.customer.name}`)
+  console.log(`📱 Telefone no Banco: "${lastApt.customer.phone}"`)
+  console.log(`💈 Unidade: ${lastApt.barbershop.name}`)
 
-  console.log('Response Status:', response.statusCode)
-  console.log('Response Body:', response.json())
+  if (!lastApt.customer.phone) {
+    console.log('⚠️ ALERTA: O cliente está sem telefone! Por isso o WhatsApp não dispara.')
+  }
 }
 
-test().catch(console.error)
+checkLastAppointment()
+  .catch(console.error)
+  .finally(() => prisma.$disconnect())

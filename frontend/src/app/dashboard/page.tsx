@@ -3,7 +3,7 @@
 import { TrendingUp, Users, Calendar as CalendarIcon, DollarSign, Loader2, BarChart3, Clock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { api, BARBERSHOP_ID } from '@/lib/api'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -13,11 +13,12 @@ export default function AdminDashboard() {
 
   // Buscar Relatório Detalhado (BI)
   const { data: report, isLoading } = useQuery({
-    queryKey: ['report-summary', start, end],
+    queryKey: ['report-summary', start, end, BARBERSHOP_ID],
     queryFn: async () => {
-      const response = await api.get(`/appointments/reports?startDate=${start}&endDate=${end}`)
+      const response = await api.get(`/appointments/reports?startDate=${start}&endDate=${end}&barbershopId=${BARBERSHOP_ID}`)
       return response.data
-    }
+    },
+    enabled: !!BARBERSHOP_ID
   })
 
   if (isLoading) {

@@ -1,6 +1,7 @@
 'use client'
 
-import { Calendar as CalendarIcon, CheckCircle, Clock, User, Scissors } from 'lucide-react'
+import { useState } from 'react'
+import { Calendar as CalendarIcon, CheckCircle, Clock, User, Scissors, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,11 +21,15 @@ import { StatusView } from '@/components/StatusView'
 
 export default function AgendaPage() {
   const queryClient = useQueryClient()
+  const [page, setPage] = useState(1)
 
-  const { data: appointments, isLoading, isError, refetch } = useQuery({
-    queryKey: ['appointments-full'],
-    queryFn: async () => (await api.get('/appointments')).data
+  const { data: response, isLoading, isError, refetch } = useQuery({
+    queryKey: ['appointments-full', page],
+    queryFn: async () => (await api.get(`/appointments?page=${page}&limit=10`)).data
   })
+
+  const appointments = response?.data || []
+  const meta = response?.meta
 
   const completeMutation = useMutation({
     mutationFn: async (id: string) => api.patch(`/appointments/${id}/complete`),
@@ -37,6 +42,17 @@ export default function AgendaPage() {
         <div>
           <h1 className="text-4xl font-extrabold tracking-tight text-white">Agenda Completa</h1>
           <p className="text-zinc-500 font-medium mt-1 text-sm uppercase tracking-widest">Controle de atendimentos diários</p>
+        </div>
+        
+        {/* PAGINAÇÃO TOPO */}
+        <div className="flex items-center gap-2 bg-zinc-900/50 p-1.5 rounded-xl border border-zinc-800">
+           <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+              <ChevronLeft className="w-4 h-4" />
+           </Button>
+           <span className="text-[10px] font-black px-2 text-zinc-400">PÁG {page}</span>
+           <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={page >= (meta?.totalPages || 1)} onClick={() => setPage(p => p + 1)}>
+              <ChevronRight className="w-4 h-4" />
+           </Button>
         </div>
       </div>
 

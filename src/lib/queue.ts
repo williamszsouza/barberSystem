@@ -5,29 +5,39 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
-// 🛡️ Ajuste de Resiliência: Conexão com Timeouts curtos para não travar a API
-const redisConnection = process.env.REDIS_URL 
-  ? new Redis(process.env.REDIS_URL, { 
-      maxRetriesPerRequest: null,
-      connectTimeout: 5000, // Desiste após 5 segundos
-      commandTimeout: 3000  // Desiste do comando após 3 segundos
-    })
-  : new Redis({
-      host: process.env.REDIS_HOST || '127.0.0.1',
-      port: Number(process.env.REDIS_PORT) || 6379,
-      maxRetriesPerRequest: null,
-      connectTimeout: 5000
-    })
+// 🛡️ Ajuste de Resiliência: Conexão Industrial para Windows/Docker/Cloud (Upstash)
+const redisUrl = process.env.REDIS_URL?.replace('localhost', '127.0.0.1') || 'redis://127.0.0.1:6379'
 
-redisConnection.on('error', (err) => {
-  console.error('❌ Erro no Redis:', err.message)
+// Verifica se a URL usa SSL (Upstash usa rediss://)
+const isTls = redisUrl.startsWith('rediss://')
+
+const redisConnection = new Redis(redisUrl, { 
+  maxRetriesPerRequest: null,
+  connectTimeout: 20000, 
+  commandTimeout: 20000,
+  tls: isTls ? { rejectUnauthorized: false } : undefined, // 🚀 Suporte para Upstash/Render
+  retryStrategy(times) {
+    const delay = Math.min(times * 50, 2000)
+    return delay
+  }
 })
+
+redisConnection.on('connect', () => console.log('✅ [Redis] Conexão estabelecida com sucesso.'))
+redisConnection.on('error', (err) => console.error('❌ [Redis] Erro de conexão:', err.message))
 
 export const notificationQueue = new Queue('notifications', {
   connection: redisConnection,
   defaultJobOptions: {
     attempts: 3,
     backoff: { type: 'exponential', delay: 1000 }
+  }
+})
+
+export const emailQueue = new Queue('emails', {
+  connection: redisConnection,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 2000 }
   }
 })
 
@@ -39,10 +49,20 @@ export async function addNotificationJob(data: {
 }) {
   const delay = new Date(data.sendAt).getTime() - Date.now()
   
-  // O BullMQ agora retorna a promessa, mas o controller não vai mais dar 'await' nela
   return notificationQueue.add('send-whatsapp', data, {
     delay: delay > 0 ? delay : 0,
-    removeOnComplete: true // Economiza memória no Redis
+    removeOnComplete: true
+  })
+}
+
+export type EmailJobData = 
+  | { type: 'WELCOME_CUSTOMER', payload: { to: string, ownerName: string, barbershopName: string } }
+  | { type: 'APPOINTMENT_CUSTOMER', payload: { to: string, customerName: string, barbershopName: string, date: string, time: string, serviceName: string, barberName: string, productsText: string, totalValue: string } }
+  | { type: 'APPOINTMENT_BARBER', payload: { to: string, barberName: string, customerName: string, date: string, time: string, serviceName: string, productsText: string, totalValue: string } }
+
+export async function addEmailJob(data: EmailJobData) {
+  return emailQueue.add('send-email', data, {
+    removeOnComplete: true
   })
 }
 

@@ -1,5 +1,5 @@
 services:
-  postgres:
+  barber-db:
     image: postgres:15
     container_name: barbersystem-db
     restart: always
@@ -8,7 +8,14 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: barbershop_db
     ports:
-      - "5432:5432"
+      - "5432:5432" 
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d barbershop_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:alpine
@@ -16,13 +23,35 @@ services:
     restart: always
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   evolution-api:
-    image: atendai/evolution-api:latest
+    image: atendai/evolution-api:v1.8.2
     container_name: evolution-api
     restart: always
     environment:
       - SERVER_PORT=8080
-      - AUTH_TOKEN=4224db922b168
+      - SERVER_URL=http://localhost:8080
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=4224db922b168
+      - DATABASE_ENABLED=false
+      - CACHE_REDIS_ENABLED=false
+      - CACHE_LOCAL_ENABLED=true
+      - ENABLED_INTEGRATIONS=whatsapp
     ports:
-      - "8080:8080"
+      - "0.0.0.0:8080:8080" # 🚀 LIBERAÇÃO TOTAL DE PORTA
+    volumes:
+      - evolution_instances:/evolution/instances
+    depends_on:
+      redis:
+        condition: service_healthy
+      barber-db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  evolution_instances:

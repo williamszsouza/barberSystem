@@ -17,69 +17,129 @@ enum Plan {
 }
 
 model Barbershop {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  cnpj        String?  @unique
-  isActive    Boolean  @default(true)
-  plan        Plan     @default(BASIC) // NOVO: Plano da assinatura
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                   String   @id @default(uuid())
+  name                 String
+  slug                 String   @unique // 🌐 Identificador para subdomínio (ex: barbearia-joe)
+  description          String?
+  cnpj                 String?  @unique
+  isActive             Boolean  @default(true)
+  plan                 Plan     @default(BASIC)
+  
+  // 💰 Feature 1: Gestão Interna de Assinaturas
+  subscriptionStatus   String?  @default("active") // active, past_due, canceled
+  nextBillingDate      DateTime? @default(now()) // Próxima data de cobrança
+  
+  // ⏰ Feature 3: Regras de Agendamento
+  cancelTimeLimit      Int      @default(2) // Horas de antecedência para cancelar
 
-  users        User[]
-  services     Service[]
-  appointments Appointment[]
-  transactions Transaction[]
-  auditLogs    AuditLog[]
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  users         User[]
+  services      Service[]
+  products      Product[]
+  appointments  Appointment[]
+  transactions  Transaction[]
+  auditLogs     AuditLog[]
+  businessHours BusinessHours[]
+  campaigns     Campaign[]
 
   @@map("barbershops")
 }
 
+// ⏰ Feature 3: Horário de Funcionamento da Barbearia
+model BusinessHours {
+  id           String     @id @default(uuid())
+  dayOfWeek    Int        // 0 = Domingo, 1 = Segunda...
+  openTime     String     // Ex: "09:00"
+  closeTime    String     // Ex: "18:00"
+  isClosed     Boolean    @default(false)
+  
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id], onDelete: Cascade)
+
+  @@unique([barbershopId, dayOfWeek])
+  @@map("business_hours")
+}
+
+// ⏰ Feature 3: Bloqueios de Agenda (Folgas, Almoço)
+model TimeOff {
+  id           String   @id @default(uuid())
+  startTime    DateTime
+  endTime      DateTime
+  reason       String?  // Ex: "Almoço", "Férias"
+  
+  barberId     String
+  barber       User     @relation(fields: [barberId], references: [id], onDelete: Cascade)
+
+  @@index([barberId])
+  @@map("time_offs")
+}
+
+// 📢 Feature 4: Campanhas de Marketing
+model Campaign {
+  id           String   @id @default(uuid())
+  name         String   // Ex: "Recuperação 30 Dias"
+  message      String   @db.Text
+  target       String   // Ex: "IDLE_30_DAYS"
+  status       String   @default("PENDING") // PENDING, PROCESSING, COMPLETED
+  recipients   Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id], onDelete: Cascade)
+
+  @@index([barbershopId])
+  @@map("campaigns")
+}
+
 enum Role {
-  SUPERADMIN // NOVO: Dono do SaaS
+  SUPERADMIN
   ADMIN    
   BARBER   
   CUSTOMER 
 }
 
-// NOVO: Tabela de Auditoria
 model AuditLog {
   id           String   @id @default(uuid())
-  action       String   // EX: "SUSPEND_TENANT", "DELETE_APPOINTMENT"
-  entity       String   // EX: "BARBERSHOP", "USER"
+  action       String
+  entity       String
   entityId     String?
   details      String?  @db.Text
   createdAt    DateTime @default(now())
 
-  // Autor da ação
   userId       String
   user         User     @relation(fields: [userId], references: [id])
 
-  // Barbearia afetada
   barbershopId String?
   barbershop   Barbershop? @relation(fields: [barbershopId], references: [id])
 
+  @@index([barbershopId, createdAt]) // 🚀 Índice para busca rápida de logs
   @@map("audit_logs")
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  name         String
-  passwordHash String
-  role         Role     @default(CUSTOMER)
-  phone        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(uuid())
+  email          String   @unique
+  name           String
+  passwordHash   String
+  role           Role     @default(CUSTOMER)
+  phone          String?
+  
+  // ✂️ Feature 2: Gestão Financeira (Comissão do Barbeiro)
+  commissionRate Decimal  @default(50.00) @db.Decimal(5, 2) // Porcentagem (Ex: 50.00)
 
-  // Multi-tenant relation
-  barbershopId String
-  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  // Relations
+  barbershopId   String
+  barbershop     Barbershop @relation(fields: [barbershopId], references: [id])
+
   appointmentsAsCustomer Appointment[] @relation("CustomerAppointments")
   appointmentsAsBarber   Appointment[] @relation("BarberAppointments")
-  auditLogs              AuditLog[] // Logs gerados por este usuário
+  auditLogs              AuditLog[]
+  timeOffs               TimeOff[] // ⏰ Relacionamento de folgas
 
   @@index([barbershopId])
   @@map("users")
@@ -132,6 +192,7 @@ model Appointment {
   serviceId String
   service   Service @relation(fields: [serviceId], references: [id])
 
+  products    AppointmentProduct[]
   transaction Transaction?
 
   @@index([barbershopId])
@@ -139,6 +200,43 @@ model Appointment {
   @@index([barberId])
   @@index([date]) // Indice para buscas de horários disponíveis rapidamente
   @@map("appointments")
+}
+
+model Product {
+  id           String   @id @default(uuid())
+  name         String
+  description  String?
+  price        Decimal  @db.Decimal(10, 2)
+  imageUrl     String?
+  stock        Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Multi-tenant relation
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
+
+  appointments AppointmentProduct[]
+
+  @@index([barbershopId])
+  @@map("products")
+}
+
+model AppointmentProduct {
+  id            String   @id @default(uuid())
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  
+  productId     String
+  product       Product @relation(fields: [productId], references: [id])
+  
+  quantity      Int      @default(1)
+  priceAtTime   Decimal  @db.Decimal(10, 2) // Salva o preço no momento da reserva
+
+  @@index([appointmentId])
+  @@index([productId])
+  @@map("appointment_products")
 }
 
 enum TransactionType {
@@ -164,6 +262,6 @@ model Transaction {
   appointmentId String?      @unique
   appointment   Appointment? @relation(fields: [appointmentId], references: [id])
 
-  @@index([barbershopId])
+  @@index([barbershopId, date]) // 🚀 Índice para relatórios financeiros
   @@map("transactions")
-}
+  }

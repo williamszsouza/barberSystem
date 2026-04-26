@@ -6,9 +6,12 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
+console.log('🤖 [Worker] Motor de notificações iniciado e aguardando mensagens...')
+
 export const notificationWorker = new Worker(
   'notifications',
   async (job) => {
+    console.log(`📩 [Worker] Nova tarefa recebida: ${job.id}`)
     const { phone, message, appointmentId } = job.data
     
     // Formatar número (garantir que tenha o DDI 55)
@@ -16,17 +19,30 @@ export const notificationWorker = new Worker(
 
     console.log(`[WhatsApp] Iniciando envio para ${formattedPhone} (Apt: ${appointmentId})`)
 
+    // 🛡️ MODO SIMULADO: Evita dependência da Evolution API em desenvolvimento
+    if (process.env.MOCK_WHATSAPP === 'true') {
+      console.log('--------------------------------------------------')
+      console.log('🤖 [MOCK WHATSAPP] Simulação de Envio:')
+      console.log(`📱 Para: ${formattedPhone}`)
+      console.log(`💬 Mensagem: ${message}`)
+      console.log('--------------------------------------------------')
+      return { success: true, mocked: true }
+    }
+
     try {
-      // 🚀 Integração com Evolution API
+      // 🚀 Integração com Evolution API (v1.8.2) com TIMEOUT
       const response = await axios.post(
         `${process.env.EVOLUTION_API_URL}/message/sendText/${process.env.EVOLUTION_INSTANCE}`,
         {
           number: formattedPhone,
-          text: message,
-          delay: 1200, // Simular digitação
+          textMessage: {
+            text: message
+          },
+          delay: 1200, 
           linkPreview: true
         },
         {
+          timeout: 15000, // 🛡️ Não trava o worker se a API demorar
           headers: {
             'apikey': process.env.EVOLUTION_API_KEY,
             'Content-Type': 'application/json'
@@ -37,9 +53,20 @@ export const notificationWorker = new Worker(
       console.log(`✅ WhatsApp enviado com sucesso para ${formattedPhone}`)
       return { success: true, messageId: response.data.key?.id }
     } catch (error: any) {
-      console.error(`❌ Falha no envio para ${formattedPhone}:`, error.response?.data || error.message)
+      const status = error.response?.status
+      const errorMsg = error.response?.data?.response?.message || error.message
+
+      console.error(`❌ Falha no envio para ${formattedPhone}:`, {
+        status,
+        error: error.response?.data?.error || 'Erro de Conexão',
+        response: errorMsg
+      })
+
+      // Se for erro de autenticação ou rota inexistente, não adianta tentar de novo
+      if (status === 401 || status === 403 || status === 404) {
+        throw new Error(`Erro fatal na Evolution API (Status ${status}): ${JSON.stringify(errorMsg)}`)
+      }
       
-      // Lançar erro faz o BullMQ tentar novamente (retry) automaticamente
       throw new Error(`Erro na Evolution API: ${error.message}`)
     }
   },

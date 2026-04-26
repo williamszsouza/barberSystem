@@ -15,10 +15,28 @@ export async function teamRoutes(app: FastifyInstance) {
   // Listar Equipe (Barbeiros)
   app.get('/', async (request) => {
     const { barbershopId } = request as any
-    return await prisma.user.findMany({
-      where: { barbershopId, role: 'BARBER' },
-      select: { id: true, name: true, email: true, phone: true, createdAt: true }
+    const querySchema = z.object({
+      page: z.string().optional().transform(Number).default('1'),
+      limit: z.string().optional().transform(Number).default('20')
     })
+    const { page, limit } = querySchema.parse(request.query)
+    const skip = (page - 1) * limit
+
+    const [total, items] = await Promise.all([
+      prisma.user.count({ where: { barbershopId, role: 'BARBER' } }),
+      prisma.user.findMany({
+        where: { barbershopId, role: 'BARBER' },
+        select: { id: true, name: true, email: true, phone: true, createdAt: true },
+        take: limit,
+        skip,
+        orderBy: { name: 'asc' }
+      })
+    ])
+
+    return {
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      data: items
+    }
   })
 
   // Adicionar Novo Barbeiro

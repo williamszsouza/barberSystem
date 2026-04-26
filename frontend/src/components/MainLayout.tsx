@@ -10,7 +10,13 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   
-  const isPublicRoute = pathname === '/' || pathname === '/agendar' || pathname === '/my-appointments' || pathname.startsWith('/superadmin/login')
+  // Rotas que NÃO exibem Sidebar
+  const isPublicRoute = 
+    pathname === '/' || 
+    pathname === '/agendar' || 
+    pathname === '/my-appointments' || 
+    pathname === '/suspensa' || 
+    pathname.startsWith('/superadmin/login')
 
   if (isPublicRoute) {
     return (
@@ -21,13 +27,11 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-zinc-950 text-zinc-50">
-      {/* Sidebar Desktop */}
+    <div className="flex min-h-screen bg-zinc-950 text-zinc-50 font-sans">
       <div className="hidden md:block">
         <Sidebar />
       </div>
 
-      {/* Sidebar Mobile (Overlay) */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 md:hidden animate-in fade-in duration-300">
           <div className="w-64 h-full relative animate-in slide-in-from-left duration-300">
@@ -44,13 +48,11 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Área Principal */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header Mobile */}
         <header className="md:hidden flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-900/50">
-          <h1 className="text-lg font-bold tracking-tighter">BARBER<span className="text-amber-500">SYSTEM</span></h1>
+          <h1 className="text-lg font-bold tracking-tighter text-white">BARBER<span className="text-amber-500">SYSTEM</span></h1>
           <Button variant="outline" size="icon" onClick={() => setIsMobileMenuOpen(true)} className="border-zinc-800">
-            <Menu className="w-6 h-6" />
+            <Menu className="w-6 h-6 text-white" />
           </Button>
         </header>
 

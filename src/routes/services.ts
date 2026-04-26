@@ -14,10 +14,27 @@ export async function serviceRoutes(app: FastifyInstance) {
   // Listar todos os serviços da barbearia
   app.get('/', async (request) => {
     const { barbershopId } = request as any
-    return await prisma.service.findMany({
-      where: { barbershopId },
-      orderBy: { createdAt: 'asc' }
+    const querySchema = z.object({
+      page: z.string().optional().transform(Number).default('1'),
+      limit: z.string().optional().transform(Number).default('20')
     })
+    const { page, limit } = querySchema.parse(request.query)
+    const skip = (page - 1) * limit
+
+    const [total, items] = await Promise.all([
+      prisma.service.count({ where: { barbershopId } }),
+      prisma.service.findMany({
+        where: { barbershopId },
+        take: limit,
+        skip,
+        orderBy: { createdAt: 'asc' }
+      })
+    ])
+
+    return {
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      data: items
+    }
   })
 
   // Criar novo serviço

@@ -80,7 +80,7 @@ export default function TransacoesPage() {
       <StatusView
         isLoading={isLoading}
         isError={isError}
-        isEmpty={data?.transactions.length === 0}
+        isEmpty={!data || data.transactions.length === 0}
         emptyTitle="Sem transações no período"
         emptyMessage="Não encontramos nenhum registro financeiro para as datas selecionadas."
         icon={Receipt}

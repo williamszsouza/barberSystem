@@ -5,7 +5,10 @@ import { AppointmentService } from './appointment-service.js'
 vi.mock('../lib/prisma.js', () => {
   const mPrisma: any = {
     service: {
-      findUnique: vi.fn().mockResolvedValue({ id: 'service-1', duration: 30 })
+      findUnique: vi.fn().mockResolvedValue({ id: 'service-1', duration: 30, barbershopId: 'tenant-1' })
+    },
+    user: {
+      findUnique: vi.fn().mockResolvedValue({ id: 'barber-1', barbershopId: 'tenant-1', role: 'BARBER' })
     },
     appointment: {
       findFirst: vi.fn().mockResolvedValue(null),
@@ -16,6 +19,14 @@ vi.mock('../lib/prisma.js', () => {
         appointment: {
           findFirst: vi.fn().mockResolvedValue(null),
           create: vi.fn().mockImplementation((data) => Promise.resolve({ id: 'new-apt', ...data.data }))
+        },
+        product: {
+          findMany: vi.fn().mockResolvedValue([
+            { id: 'prod-1', name: 'Pomada', price: 45.00 }
+          ])
+        },
+        appointmentProduct: {
+          createMany: vi.fn().mockResolvedValue({ count: 1 })
         }
       }
       return callback(tx)
@@ -36,6 +47,25 @@ describe('AppointmentService', () => {
       customerId: 'customer-1',
       serviceId: 'service-1',
       barbershopId: 'tenant-1'
+    })
+
+    expect(appointment).toHaveProperty('id')
+  })
+
+  it('should be able to create an appointment with products', async () => {
+    const service = new AppointmentService()
+    const date = new Date()
+    date.setHours(date.getHours() + 2)
+
+    const appointment = await service.create({
+      date,
+      barberId: 'barber-1',
+      customerId: 'customer-1',
+      serviceId: 'service-1',
+      barbershopId: 'tenant-1',
+      products: [
+        { productId: 'prod-1', quantity: 1 }
+      ]
     })
 
     expect(appointment).toHaveProperty('id')

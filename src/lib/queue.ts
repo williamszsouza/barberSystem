@@ -6,10 +6,17 @@ import dotenv from 'dotenv'
 dotenv.config()
 
 // 🛡️ Ajuste de Resiliência: Conexão Industrial para Windows/Docker/Cloud (Upstash)
-const redisUrl = process.env.REDIS_URL?.replace('localhost', '127.0.0.1') || 'redis://127.0.0.1:6379'
+// Higieniza a URL removendo possíveis comandos do CLI do Upstash (--tls -u) e espaços
+const rawRedisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379'
+const redisUrl = rawRedisUrl
+  .replace('redis-cli', '')
+  .replace('--tls', '')
+  .replace('-u', '')
+  .trim()
+  .replace('localhost', '127.0.0.1')
 
-// Verifica se a URL usa SSL (Upstash usa rediss://)
-const isTls = redisUrl.startsWith('rediss://')
+// Verifica se a URL usa SSL (Upstash usa rediss:// ou se a string original continha --tls)
+const isTls = redisUrl.startsWith('rediss://') || rawRedisUrl.includes('--tls')
 
 const redisConnection = new Redis(redisUrl, { 
   maxRetriesPerRequest: null,
